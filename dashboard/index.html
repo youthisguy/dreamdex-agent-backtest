@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>dreamDEX Event Contracts — Agent Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0B0F14;
+    --surface: #121821;
+    --surface-2: #171F2A;
+    --border: #232B36;
+    --text: #D8DEE8;
+    --text-dim: #7C8798;
+    --amber: #E8A33D;
+    --up: #4FBF7A;
+    --down: #E0665A;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --font-sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+
+  /* Ticker tape — signature element: reads like a Bloomberg strip but shows
+     agent reasoning, not price quotes. */
+  .ticker-wrap {
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 8px 0;
+  }
+  .ticker {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--amber);
+    animation: scroll-left 40s linear infinite;
+    padding-left: 100%;
+  }
+  .ticker span { margin-right: 48px; }
+  .ticker .up { color: var(--up); }
+  .ticker .down { color: var(--down); }
+  @keyframes scroll-left {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticker { animation: none; padding-left: 0; }
+  }
+
+  header {
+    padding: 28px 32px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  h1 {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+  h1 .dim { color: var(--text-dim); font-weight: 400; }
+  .status-pill {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); }
+  .dot.live { background: var(--up); box-shadow: 0 0 8px var(--up); }
+
+  .loader {
+    margin: 8px 32px 24px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .loader label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .loader input[type="file"] {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .loader .hint { font-size: 12px; color: var(--text-dim); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1.4fr;
+    gap: 20px;
+    padding: 0 32px 32px;
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card h2 {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .stat .label { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); text-transform: uppercase; }
+  .stat .value { font-size: 20px; font-family: var(--font-mono); font-weight: 600; margin-top: 4px; }
+  .stat .value.pos { color: var(--up); }
+  .stat .value.neg { color: var(--down); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--text);
+  }
+  tr:hover td { background: var(--surface-2); }
+  .side-up { color: var(--up); font-weight: 600; }
+  .side-down { color: var(--down); font-weight: 600; }
+  .side-none { color: var(--text-dim); }
+  .reason-cell { color: var(--text-dim); max-width: 260px; white-space: normal; }
+
+  .position-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .position-item .side { font-family: var(--font-mono); font-weight: 600; font-size: 15px; }
+  .empty-state {
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 24px 0;
+    text-align: center;
+    font-family: var(--font-mono);
+  }
+
+  #pnlChart { max-height: 220px; }
+
+  .scroll-body { max-height: 420px; overflow-y: auto; }
+  .scroll-body::-webkit-scrollbar { width: 6px; }
+  .scroll-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+  <div class="ticker-wrap">
+    <div class="ticker" id="tickerTape">
+      <span>waiting for a decision log to load…</span>
+    </div>
+  </div>
+
+  <header>
+    <h1>dreamDEX <span class="dim">/ event contracts agent terminal</span></h1>
+    <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">no data loaded</span></div>
+  </header>
+
+  <div class="loader">
+    <label for="fileInput">LOAD LOG →</label>
+    <input type="file" id="fileInput" accept=".jsonl,.json,.csv" />
+    <span class="hint">accepts logs/decisions.jsonl (live feed) or backtest/out/all_windows.csv (backtest)</span>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Open Positions</h2>
+      <div id="positionsList"><div class="empty-state">no open positions</div></div>
+
+      <h2 style="margin-top:24px;">Cumulative PnL</h2>
+      <canvas id="pnlChart"></canvas>
+
+      <div class="stat-row" style="margin-top:20px; grid-template-columns: repeat(2, 1fr);">
+        <div class="stat">
+          <div class="label">Windows Traded</div>
+          <div class="value" id="statTraded">–</div>
+        </div>
+        <div class="stat">
+          <div class="label">Win Rate</div>
+          <div class="value" id="statWinRate">–</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Decision Feed <span style="color:var(--text-dim); text-transform:none; font-weight:400;">— why each trade was (or wasn't) taken</span></h2>
+      <div class="scroll-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Side</th>
+              <th>Model P(up)</th>
+              <th>Mkt P(up)</th>
+              <th>Edge</th>
+              <th>Regime</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="decisionRows">
+            <tr><td colspan="7" class="empty-state">no decisions logged yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+let chart;
+
+function fmtPct(v) {
+  if (v === null || v === undefined || isNaN(v)) return '–';
+  return (v * 100).toFixed(1) + '%';
+}
+function fmtSigned(v) {
+  if (v === null || v === undefined || isNaN(v)) return '–';
+  const s = v >= 0 ? '+' : '';
+  return s + (v * 100).toFixed(1) + 'c';
+}
+
+function parseJsonl(text) {
+  return text.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',');
+  return lines.slice(1).map(line => {
+    const cells = line.split(',');
+    const row = {};
+    headers.forEach((h, i) => {
+      let v = cells[i];
+      if (v === 'True') v = true;
+      else if (v === 'False') v = false;
+      else if (v === '' ) v = null;
+      else if (!isNaN(v)) v = parseFloat(v);
+      row[h] = v;
+    });
+    return row;
+  });
+}
+
+function render(records) {
+  document.getElementById('statusDot').classList.add('live');
+  document.getElementById('statusText').textContent = `${records.length} records loaded`;
+
+  // Ticker tape: most recent 25 decisions
+  const tape = records.slice(-25).map(r => {
+    const side = r.side || 'SIT OUT';
+    const cls = side === 'UP' ? 'up' : side === 'DOWN' ? 'down' : '';
+    const edge = r.edge !== undefined ? fmtSigned(r.edge) : '';
+    return `<span class="${cls}">${r.time || ''} · ${side} ${edge}</span>`;
+  }).join('');
+  document.getElementById('tickerTape').innerHTML = tape || '<span>no decisions yet</span>';
+
+  // Decision feed table (most recent first)
+  const rows = records.slice().reverse().slice(0, 200).map(r => {
+    const sideClass = r.side === 'UP' ? 'side-up' : r.side === 'DOWN' ? 'side-down' : 'side-none';
+    return `<tr>
+      <td>${r.time || ''}</td>
+      <td class="${sideClass}">${r.side || 'SIT OUT'}</td>
+      <td>${fmtPct(r.model_prob_up)}</td>
+      <td>${fmtPct(r.market_prob_up)}</td>
+      <td>${fmtSigned(r.edge)}</td>
+      <td>${r.vol_regime || ''}</td>
+      <td class="reason-cell">${r.reason || ''}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('decisionRows').innerHTML = rows || '<tr><td colspan="7" class="empty-state">no decisions logged yet</td></tr>';
+
+  // Trades / pnl
+  const trades = records.filter(r => r.side === 'UP' || r.side === 'DOWN');
+  const withPnl = trades.filter(r => r.pnl !== undefined && r.pnl !== null);
+
+  document.getElementById('statTraded').textContent = trades.length;
+  const won = withPnl.filter(r => r.won === true).length;
+  document.getElementById('statWinRate').textContent = withPnl.length ? fmtPct(won / withPnl.length) : '–';
+
+  let cumulative = 0;
+  const pnlSeries = withPnl.map(r => { cumulative += (r.pnl || 0); return cumulative; });
+  const labels = withPnl.map(r => r.time || '');
+
+  const ctx = document.getElementById('pnlChart').getContext('2d');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: pnlSeries,
+        borderColor: '#E8A33D',
+        backgroundColor: 'rgba(232,163,61,0.08)',
+        fill: true,
+        tension: 0.15,
+        pointRadius: 0,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { display: false },
+        y: { grid: { color: '#232B36' }, ticks: { color: '#7C8798', font: { family: 'IBM Plex Mono', size: 10 } } }
+      }
+    }
+  });
+
+  // Open positions — for backtest data there are none; for a live decisions.jsonl
+  // feed, treat the last entry per contract with no matching exit as "open".
+  document.getElementById('positionsList').innerHTML = '<div class="empty-state">wire live/agent.py output here once trading testnet</div>';
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  let records;
+  if (file.name.endsWith('.jsonl') || file.name.endsWith('.json')) {
+    records = file.name.endsWith('.json') ? JSON.parse(text) : parseJsonl(text);
+  } else {
+    records = parseCsv(text);
+  }
+  render(records);
+});
+</script>
+</body>
+</html>
